@@ -1,19 +1,6 @@
 import { google, docs_v1 } from 'googleapis';
-import { OAuth2Client } from 'google-auth-library';
-import { env } from '../config/env';
 import { AppError } from '../utils/errors';
-
-// Helper to construct authenticated client (Duplicated logic for now, ideally shared)
-const getUserAuth = async (userId: string): Promise<OAuth2Client> => {
-  const oauth2Client = new google.auth.OAuth2(
-    env.GOOGLE_CLIENT_ID,
-    env.GOOGLE_CLIENT_SECRET,
-    env.GOOGLE_REDIRECT_URI
-  );
-  // Placeholder: Load tokens from DB
-  // oauth2Client.setCredentials({ access_token: ... });
-  return oauth2Client;
-};
+import { getUserAuth } from './googleAuth';
 
 export const fetchDocument = async (userId: string, googleDocId: string) => {
   try {

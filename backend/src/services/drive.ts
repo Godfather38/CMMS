@@ -1,32 +1,29 @@
-import { google, drive_v3, docs_v1 } from 'googleapis';
-import { OAuth2Client } from 'google-auth-library';
-import { env } from '../config/env';
+import { google, drive_v3 } from 'googleapis';
 import { AppError } from '../utils/errors';
+import { getUserAuth } from './googleAuth';
 
-// Helper to construct an authenticated client for a specific user
-// In production, fetch tokens from DB (users table or user_secrets table)
-const getUserAuth = async (userId: string): Promise<OAuth2Client> => {
-  const oauth2Client = new google.auth.OAuth2(
-    env.GOOGLE_CLIENT_ID,
-    env.GOOGLE_CLIENT_SECRET,
-    env.GOOGLE_REDIRECT_URI
-  );
+export const listFilesInFolder = async (
+  userId: string,
+  folderId: string
+): Promise<drive_v3.Schema$File[]> => {
+  const auth = await getUserAuth(userId);
+  const drive = google.drive({ version: 'v3', auth });
 
-  // MOCK: Retrieving tokens from DB.
-  // Replace this with actual DB call: SELECT access_token, refresh_token FROM ...
-  // For now, we assume the mechanism exists.
-  // const tokens = await db.getUserTokens(userId);
-  // oauth2Client.setCredentials(tokens);
+  const files: drive_v3.Schema$File[] = [];
+  let pageToken: string | undefined;
 
-  // If we don't have this implemented, operations will fail without valid creds.
-  // Throwing a descriptive error for the purpose of this file generation.
-  // To make this runnable without DB tokens, one might pass tokens in headers,
-  // but standard OAuth flow stores them backend side.
-  
-  // Placeholder for type safety in this file generation:
-  // oauth2Client.setCredentials({ access_token: '...', refresh_token: '...' });
+  do {
+    const res = await drive.files.list({
+      q: `'${folderId}' in parents and mimeType = 'application/vnd.google-apps.document' and trashed = false`,
+      fields: 'nextPageToken, files(id, name, modifiedTime, appProperties)',
+      pageSize: 100,
+      pageToken,
+    });
+    files.push(...(res.data.files || []));
+    pageToken = res.data.nextPageToken || undefined;
+  } while (pageToken);
 
-  return oauth2Client; 
+  return files;
 };
 
 export const getFileMetadata = async (userId: string, fileId: string) => {

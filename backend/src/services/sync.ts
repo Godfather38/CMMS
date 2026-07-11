@@ -1,8 +1,9 @@
 import { db } from '../config/database';
 import { SyncResult, FullSyncResult, SyncStatus } from '../types/sync';
 import * as googleDocs from './googleDocs';
-import * as driveService from './drive'; // Reusing file listing
-import * as docService from './documents'; // Reusing registration
+import * as driveService from './drive';
+import * as docService from './documents';
+import { getUserById } from './auth';
 import { AppError } from '../utils/errors';
 
 export const syncDocument = async (userId: string, documentId: string): Promise<SyncResult> => {
@@ -124,28 +125,17 @@ export const syncAllDocuments = async (userId: string): Promise<FullSyncResult> 
     errors: []
   };
 
-  // 1. Get Watched Folder
-  const userRes = await db.query('SELECT watched_folder_id FROM users WHERE id = $1', [userId]);
-  const folderId = userRes.rows[0]?.watched_folder_id;
+  // 1. Get Watched Folder + User
+  const user = await getUserById(userId);
+  if (!user) throw new AppError('User not found', 404);
 
+  const folderId = user.watched_folder_id;
   if (!folderId) {
     throw new AppError('No watched folder configured', 400);
   }
 
   // 2. List Drive Files
-  // Assuming driveService.listFiles exists or using raw google calls. 
-  // We'll simulate a list call here using googleapis directly or a helper.
-  // Since we haven't implemented `listFiles` in `drive.ts` yet in this session, 
-  // I will assume it returns minimal metadata.
-  
-  // MOCK LIST CALL (Replace with actual driveService.listFiles)
-  // const driveFiles = await driveService.listFiles(userId, folderId);
-  // For now, implementing rudimentary list here to be self-contained:
-  const auth = await googleDocs.fetchDocument(userId, 'mock-id').catch(() => null).then(() => null); // Hack to get auth?? No, stick to pattern.
-  // We need an auth client. 
-  // Let's assume driveService has `listFiles` added or we add it now.
-  // I will add a helper in this file for listing to keep it working.
-  const driveFiles = await listDriveFiles(userId, folderId);
+  const driveFiles = await driveService.listFilesInFolder(userId, folderId);
 
   // 3. Get DB Documents
   const dbDocsRes = await db.query(
@@ -156,6 +146,7 @@ export const syncAllDocuments = async (userId: string): Promise<FullSyncResult> 
 
   // 4. Process Drive Files
   for (const file of driveFiles) {
+    if (!file.id) continue;
     if (dbDocsMap.has(file.id)) {
       // Exists: Sync it
       try {
@@ -170,10 +161,7 @@ export const syncAllDocuments = async (userId: string): Promise<FullSyncResult> 
     } else {
       // New File: Auto-register
       try {
-        await docService.registerDocument(
-            { id: userId } as any, // Mock user object
-            { google_file_id: file.id }
-        );
+        await docService.registerDocument(user, { google_file_id: file.id });
         result.documents_added++;
       } catch (err: any) {
         console.error('Failed to auto-register', err);
@@ -182,7 +170,7 @@ export const syncAllDocuments = async (userId: string): Promise<FullSyncResult> 
   }
 
   // 5. Handle Deleted Files (Remaining in Map)
-  for (const [googleId, docId] of dbDocsMap) {
+  for (const [, docId] of dbDocsMap) {
     await db.query('UPDATE documents SET is_active = false WHERE id = $1', [docId]);
     result.documents_removed++;
   }
@@ -227,27 +215,4 @@ const logSync = async (userId: string, docId: string | null, action: string, sta
     `INSERT INTO sync_log (user_id, document_id, action, status, details) VALUES ($1, $2, $3, $4, $5)`,
     [userId, docId, action, status, JSON.stringify(details)]
   );
-};
-
-// Minimal list implementation
-const listDriveFiles = async (userId: string, folderId: string) => {
-    // This logic duplicates driveService but is necessary if driveService is missing the method.
-    // In a real codebase, export listFiles from drive.ts.
-    const { google } = require('googleapis');
-    const { env } = require('../config/env');
-    const oauth2Client = new google.auth.OAuth2(
-        env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET, env.GOOGLE_REDIRECT_URI
-    );
-    // Placeholder credentials
-    // oauth2Client.setCredentials(...) 
-    
-    const drive = google.drive({ version: 'v3', auth: oauth2Client });
-    
-    // In production, handle pagination
-    const res = await drive.files.list({
-        q: `'${folderId}' in parents and mimeType = 'application/vnd.google-apps.document' and trashed = false`,
-        fields: 'files(id, name)'
-    });
-    
-    return res.data.files || [];
 };

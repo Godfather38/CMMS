@@ -7,7 +7,8 @@ import segmentRoutes from './routes/segments';
 import categoryRoutes from './routes/categories';
 import tagRoutes from './routes/tags';
 import searchRoutes from './routes/search';
-import syncRoutes from './routes/sync'; // Add this
+import syncRoutes from './routes/sync';
+import colorRoutes from './routes/colors';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -23,7 +24,8 @@ app.use('/api/v1/segments', segmentRoutes);
 app.use('/api/v1/categories', categoryRoutes);
 app.use('/api/v1/tags', tagRoutes);
 app.use('/api/v1/search', searchRoutes);
-app.use('/api/v1/sync', syncRoutes); // Add this
+app.use('/api/v1/sync', syncRoutes);
+app.use('/api/v1/colors', colorRoutes);
 
 // Health Check
 app.get('/health', (req, res) => {

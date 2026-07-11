@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { requireAuth } from '../middleware/auth';
 import { validate, listDocumentsSchema, createDocumentSchema, createFromSelectionSchema, documentIdParamSchema } from '../middleware/validation';
 import * as docService from '../services/documents';
+import * as syncService from '../services/sync';
 import { AuthenticatedRequest } from '../types';
 import { AppError } from '../utils/errors';
 
@@ -78,16 +79,8 @@ router.delete('/:id', validate(documentIdParamSchema), async (req: Authenticated
 // POST /api/v1/documents/:id/sync
 router.post('/:id/sync', validate(documentIdParamSchema), async (req: AuthenticatedRequest, res: Response, next) => {
   try {
-    // Sync logic implementation deferred to Sync Prompt, but endpoint exists.
-    // Check existence first
-    const doc = await docService.getDocumentById(req.user!.id, req.params.id);
-    if (!doc) throw new AppError('Document not found', 404);
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Sync triggered (stub)',
-      data: { document_id: req.params.id, synced_at: new Date() }
-    });
+    const result = await syncService.syncDocument(req.user!.id, req.params.id);
+    res.status(200).json({ status: 'success', data: result });
   } catch (err) { next(err); }
 });
 

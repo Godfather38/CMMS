@@ -133,6 +133,24 @@ export const segmentIdParamSchema = z.object({
   }),
 });
 
+export const updateSegmentColorSchema = z.object({
+  params: z.object({
+    id: z.string().uuid(),
+  }),
+  body: z.object({
+    color: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+    propagate: z.boolean().default(true).optional(),
+  }),
+});
+
+// --- COLOR SCHEMAS ---
+
+export const colorsSuggestSchema = z.object({
+  query: z.object({
+    document_id: z.string().uuid(),
+  }),
+});
+
 // --- CATEGORY SCHEMAS ---
 
 export const createCategorySchema = z.object({

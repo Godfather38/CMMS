@@ -289,37 +289,58 @@ export const updateSegment = async (userId: string, id: string, dto: UpdateSegme
   return getSegmentById(userId, id);
 };
 
-const propagateColorChange = async (userId: string, startSegmentId: string, newColor: string) => {
-  // Simplified propagation: Update direct associations where current color matches old color?
-  // Or just update all segments in the 'cluster'. 
-  // For MVP, let's update segments that share an association edge.
-  
-  // Recursive CTE to find all connected segments
-  const query = `
-    WITH RECURSIVE segment_chain AS (
-        SELECT source_segment_id, target_segment_id FROM segment_associations
+/**
+ * Same segment = same color everywhere: walk the whole association cluster
+ * (undirected — derivatives, callbacks, chains in either direction) and
+ * recolor every connected segment. UNION (not UNION ALL) dedupes visited
+ * nodes, so cycles terminate.
+ */
+export const propagateColorChange = async (
+  userId: string,
+  startSegmentId: string,
+  newColor: string
+): Promise<number> => {
+  const res = await db.query(
+    `WITH RECURSIVE cluster AS (
+        SELECT $2::uuid AS id
         UNION
-        SELECT sa.source_segment_id, sa.target_segment_id 
+        SELECT CASE WHEN sa.source_segment_id = c.id
+                    THEN sa.target_segment_id
+                    ELSE sa.source_segment_id END
         FROM segment_associations sa
-        INNER JOIN segment_chain sc ON sa.source_segment_id = sc.target_segment_id
+        JOIN cluster c ON c.id IN (sa.source_segment_id, sa.target_segment_id)
     )
-    UPDATE segments 
-    SET color = $1 
-    WHERE id IN (
-        SELECT source_segment_id FROM segment_chain
-        UNION 
-        SELECT target_segment_id FROM segment_chain
-    ) AND user_id = $2 AND id != $3
-  `;
-  // Note: This CTE logic is tricky. Simpler to just update direct targets of this source.
-  // Requirement says: "New segment inherits source color".
-  // Let's just update direct children (targets).
-  await db.query(`
-    UPDATE segments s
-    SET color = $1
-    FROM segment_associations sa
-    WHERE sa.source_segment_id = $2 AND sa.target_segment_id = s.id AND s.user_id = $3
-  `, [newColor, startSegmentId, userId]);
+    UPDATE segments
+    SET color = $1, updated_at = NOW()
+    WHERE id IN (SELECT id FROM cluster)
+      AND user_id = $3
+      AND id <> $2::uuid
+      AND color <> $1`,
+    [newColor, startSegmentId, userId]
+  );
+  return res.rowCount ?? 0;
+};
+
+export const updateSegmentColor = async (
+  userId: string,
+  id: string,
+  color: string,
+  propagate: boolean
+) => {
+  const res = await db.query(
+    'UPDATE segments SET color = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3',
+    [color, id, userId]
+  );
+  if ((res.rowCount ?? 0) === 0) throw new AppError('Segment not found', 404);
+
+  await colorService.recordColorUsage(userId, color);
+
+  let propagated = 0;
+  if (propagate) {
+    propagated = await propagateColorChange(userId, id, color);
+  }
+
+  return { updated_count: 1 + propagated };
 };
 
 export const updateMarkers = async (userId: string, id: string, dto: UpdateMarkersDTO) => {

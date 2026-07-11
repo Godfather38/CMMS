@@ -6,11 +6,12 @@ import {
   updateSegmentSchema, 
   associateSegmentSchema, 
   updateMarkersSchema, 
-  updateTagsSchema, 
-  addSegmentTagsSchema, // New
-  listSegmentsSchema, 
+  updateTagsSchema,
+  addSegmentTagsSchema,
+  updateSegmentColorSchema,
+  listSegmentsSchema,
   segmentIdParamSchema,
-  segmentIdTagIdParamSchema // New
+  segmentIdTagIdParamSchema
 } from '../middleware/validation';
 import * as segmentService from '../services/segments';
 import * as tagService from '../services/tags'; // Import Tag Service
@@ -82,6 +83,15 @@ router.put('/:id', validate(updateSegmentSchema), async (req: AuthenticatedReque
     const segment = await segmentService.updateSegment(req.user!.id, req.params.id, req.body);
     if (!segment) throw new AppError('Segment not found', 404);
     res.json({ status: 'success', data: segment });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/v1/segments/:id/color — recolor a segment and (by default) its whole association cluster
+router.put('/:id/color', validate(updateSegmentColorSchema), async (req: AuthenticatedRequest, res: Response, next) => {
+  try {
+    const propagate = req.body.propagate !== false;
+    const result = await segmentService.updateSegmentColor(req.user!.id, req.params.id, req.body.color, propagate);
+    res.json({ status: 'success', data: result });
   } catch (err) { next(err); }
 });
 

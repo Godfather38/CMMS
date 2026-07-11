@@ -23,9 +23,11 @@ export const listSegments = async (userId: string, filters: SegmentQueryFilters)
     order = 'desc' 
   } = filters;
 
-  const params: any[] = [userId, limit, offset];
-  let paramIdx = 4;
-  
+  // Filter params only; limit/offset are appended last so the count query
+  // can reuse the same array without unreferenced placeholders.
+  const params: any[] = [userId];
+  let paramIdx = 2;
+
   // Base Query
   let selectClause = `
     SELECT 
@@ -104,10 +106,10 @@ export const listSegments = async (userId: string, filters: SegmentQueryFilters)
     ${whereClause}
     GROUP BY s.id, c.id, d.id
     ORDER BY s.${sort} ${order.toUpperCase()}
-    LIMIT $2 OFFSET $3
+    LIMIT $${paramIdx} OFFSET $${paramIdx + 1}
   `;
 
-  const { rows } = await db.query(query, params);
+  const { rows } = await db.query(query, [...params, limit, offset]);
   
   // Transform flat structure to nested objects expected by frontend
   const formattedRows = rows.map((r: any) => ({
@@ -120,7 +122,7 @@ export const listSegments = async (userId: string, filters: SegmentQueryFilters)
 
   // Count Query for Pagination
   const countQuery = `SELECT COUNT(DISTINCT s.id) FROM segments s ${joins} ${whereClause}`;
-  const countRes = await db.query(countQuery, params.slice(0, paramIdx - 1)); // Exclude limit/offset
+  const countRes = await db.query(countQuery, params);
 
   return {
     data: formattedRows,

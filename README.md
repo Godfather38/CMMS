@@ -131,6 +131,34 @@ All endpoints live under `/api/v1` and require `Authorization: Bearer <jwt>`
 | Sync | `POST /sync/full`, `POST /sync/document/:id`, `GET /sync/status` |
 | Colors | `GET /colors/suggest?document_id=` |
 
+## Deploying the frontend to Vercel
+
+This is a monorepo with no root `package.json`, so Vercel can't build from the
+repo root — pointing a project straight at the repo without configuring this
+results in a 404 on every page.
+
+1. In the Vercel project → **Settings → General → Root Directory**, set it to
+   `frontend`. Vercel will then auto-detect the Vite framework and build
+   `frontend/dist`.
+2. `frontend/vercel.json` (already in the repo) rewrites all paths to
+   `index.html` so React Router's client-side routes don't 404 on refresh.
+3. API calls: the frontend calls the relative path `/api/v1/...`. Vercel only
+   hosts the static frontend, so once the 404 above is fixed you'll see API
+   requests fail next (nothing is listening at `/api` on the Vercel domain).
+   Deploy `backend/` to a Node host (Railway/Render — see Production notes
+   below), then add a rewrite in `frontend/vercel.json` so `/api/*` proxies to
+   it:
+   ```json
+   {
+     "rewrites": [
+       { "source": "/api/:path*", "destination": "https://YOUR-BACKEND-URL/api/:path*" },
+       { "source": "/:path*", "destination": "/index.html" }
+     ]
+   }
+   ```
+   (Put the API rewrite first — rewrites are matched in order, and the
+   catch-all would otherwise swallow `/api/*` first.)
+
 ## Production notes
 
 - Serve the built SPA (`frontend/dist`) same-origin with the API, or configure

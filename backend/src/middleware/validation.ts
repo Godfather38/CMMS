@@ -196,6 +196,9 @@ export const updateTagSchema = z.object({
 });
 
 export const addSegmentTagsSchema = z.object({
+  params: z.object({
+    segment_id: z.string().uuid(),
+  }),
   body: z.object({
     tag_ids: z.array(z.string().uuid()).min(1),
   }),
@@ -225,6 +228,15 @@ export const segmentIdTagIdParamSchema = z.object({
   params: z.object({
     segment_id: z.string().uuid(),
     tag_id: z.string().uuid(),
+  }),
+});
+
+// --- AUTH SCHEMAS ---
+
+export const updateMeSchema = z.object({
+  body: z.object({
+    display_name: z.string().min(1).max(255).optional(),
+    watched_folder_id: z.string().max(255).nullable().optional(),
   }),
 });
 

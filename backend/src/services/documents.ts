@@ -24,7 +24,7 @@ export const listDocuments = async (userId: string, filters: DocumentQueryFilter
   `;
 
   if (search) {
-    query += ` AND (d.title ILIKE $${paramIdx} OR d.title ILIKE $${paramIdx})`; // Simplified title search
+    query += ` AND d.title ILIKE $${paramIdx}`;
     params.push(`%${search}%`);
     paramIdx++;
   }
@@ -109,10 +109,10 @@ export const registerDocument = async (user: User, dto: CreateDocumentDTO) => {
     
     // Copy
     const copyRes = await driveService.copyFileToFolder(
-      user.id, 
-      fileId, 
-      user.watched_folder_id, 
-      originalMeta.name // Keep original name
+      user.id,
+      fileId,
+      user.watched_folder_id,
+      originalMeta.name ?? undefined // Keep original name
     );
     fileId = copyRes.id!;
   }

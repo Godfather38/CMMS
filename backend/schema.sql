@@ -130,7 +130,21 @@ CREATE TABLE color_usage (
     PRIMARY KEY (user_id, color)
 );
 
--- 10. SYNC LOG TABLE
+-- 10. USER GOOGLE TOKENS TABLE
+-- OAuth credentials for Drive/Docs API access. Kept separate from users
+-- so secrets never ride along on the User object attached to requests.
+CREATE TABLE user_google_tokens (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT,
+    scope TEXT,
+    token_type VARCHAR(50) DEFAULT 'Bearer',
+    expiry_date BIGINT, -- ms since epoch, as returned by googleapis
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 11. SYNC LOG TABLE
 -- For debugging sync operations and conflict resolution
 CREATE TABLE sync_log (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -192,6 +206,7 @@ CREATE TRIGGER update_users_modtime BEFORE UPDATE ON users FOR EACH ROW EXECUTE 
 CREATE TRIGGER update_prefs_modtime BEFORE UPDATE ON user_preferences FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_cats_modtime BEFORE UPDATE ON categories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_docs_modtime BEFORE UPDATE ON documents FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_google_tokens_modtime BEFORE UPDATE ON user_google_tokens FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ==========================================
 -- SEED DATA

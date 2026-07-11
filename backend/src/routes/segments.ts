@@ -103,7 +103,7 @@ router.put('/:id/tags', validate(updateTagsSchema), async (req: AuthenticatedReq
 });
 
 // POST /api/v1/segments/:segment_id/tags (Add tags)
-router.post('/:segment_id/tags', validate(segmentIdParamSchema), validate(addSegmentTagsSchema), async (req: AuthenticatedRequest, res: Response, next) => {
+router.post('/:segment_id/tags', validate(addSegmentTagsSchema), async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const segment = await tagService.addTagsToSegment(req.user!.id, req.params.segment_id, req.body.tag_ids);
     res.json({ status: 'success', data: segment });

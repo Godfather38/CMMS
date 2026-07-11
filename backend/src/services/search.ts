@@ -11,47 +11,6 @@ export const searchSegments = async (userId: string, dto: SearchRequestDTO): Pro
     order = 'desc' 
   } = dto;
 
-  // 1. Construct Main Query
-  // We use Common Table Expression (CTE) to filter and rank first
-  
-  const params: any[] = [userId, limit, offset];
-  let paramIdx = 4; // Start after $1(userId), $2(limit), $3(offset)
-
-  // -- FILTER CONSTRUCTION HELPERS --
-  
-  const buildWhereClause = (excludeFacet: 'none' | 'category' | 'tags') => {
-    let clauses = [`s.user_id = $1`];
-    
-    // Text Search Filter
-    // If query is present, we must match it. If empty, match all.
-    if (query && query.trim() !== '') {
-      // Use websearch_to_tsquery for natural language search
-      clauses.push(`s.text_content_tsvector @@ websearch_to_tsquery('english', $${paramIdx})`);
-      // Note: We don't increment paramIdx here because we might reuse the query param value 
-      // in multiple places (rank, highlight), but for simplicity in string building, 
-      // we'll handle the param array addition outside this builder or pass the index.
-      // Actually, let's keep it simple: The query param will be pushed once, and we refer to its index.
-    }
-
-    // Category Filter
-    if (filters.category_ids && filters.category_ids.length > 0 && excludeFacet !== 'category') {
-      clauses.push(`s.category_id = ANY($${paramIdx + (query ? 1 : 0)}::uuid[])`);
-    }
-
-    // Document Filter
-    if (filters.document_ids && filters.document_ids.length > 0) {
-      // Index shift depends on which previous params were added. 
-      // This dynamic construction is getting tricky. 
-      // Let's use named placeholders logic or a robust builder pattern.
-      // For this implementation, I will build the parameters array dynamically alongside the query.
-    }
-
-    // ... (logic continues in main execution below to manage indexes correctly)
-    return clauses;
-  };
-
-  // -- RE-IMPLEMENTING WITH ROBUST PARAM MANAGEMENT --
-
   const queryParams: any[] = [userId];
   // $1 is userId
   

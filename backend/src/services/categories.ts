@@ -2,50 +2,10 @@ import { db } from '../config/database';
 import { Category, CreateCategoryDTO, UpdateCategoryDTO } from '../types/categories';
 import { AppError } from '../utils/errors';
 
-// Default categories to seed for new users
-const DEFAULT_CATEGORIES = [
-  { name: 'One-Liner', icon: '💬', description: 'Short, self-contained joke' },
-  { name: 'Bit', icon: '🎭', description: 'A distinct chunk of material on a specific topic' },
-  { name: 'Set', icon: '📋', description: 'A collection of bits arranged for performance' },
-  { name: 'Sketch', icon: '🎬', description: 'Scripted scene for multiple characters' },
-  { name: 'Premise', icon: '💡', description: 'An idea or concept not yet fully fleshed out' },
-  { name: 'Callback', icon: '🔄', description: 'A reference to an earlier joke' },
-  { name: 'Crowd Work', icon: '👥', description: 'Interactions with the audience' },
-  { name: 'Opener', icon: '🚀', description: 'Material used to start a set' },
-  { name: 'Closer', icon: '🎯', description: 'Strong material used to end a set' }
-];
-
+// Defaults live in the seed_default_categories() DB function (schema.sql),
+// which is idempotent via ON CONFLICT (user_id, name) DO NOTHING.
 export const seedDefaultCategories = async (userId: string) => {
-  const client = await db.pool.connect();
-  try {
-    await client.query('BEGIN');
-    
-    // Check if user already has categories to prevent double seeding
-    const check = await client.query('SELECT 1 FROM categories WHERE user_id = $1 LIMIT 1', [userId]);
-    if (check.rowCount > 0) {
-      await client.query('ROLLBACK');
-      return;
-    }
-
-    // Insert defaults
-    const values = DEFAULT_CATEGORIES.map((cat, index) => {
-      // ($1, $2, $3, $4, $5, $6)
-      return `('${userId}', '${cat.name}', '${cat.description}', '${cat.icon}', ${(index + 1) * 10}, true)`;
-    }).join(',');
-
-    const query = `
-      INSERT INTO categories (user_id, name, description, icon, sort_order, is_default)
-      VALUES ${values}
-    `;
-    
-    await client.query(query);
-    await client.query('COMMIT');
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
+  await db.query('SELECT seed_default_categories($1)', [userId]);
 };
 
 export const listCategories = async (userId: string): Promise<Category[]> => {

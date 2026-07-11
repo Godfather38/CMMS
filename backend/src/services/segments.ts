@@ -8,7 +8,7 @@ import {
   Segment
 } from '../types/segments';
 import { AppError } from '../utils/errors';
-import * as colorService from './colors';
+import * as colorService from './color';
 
 export const listSegments = async (userId: string, filters: SegmentQueryFilters) => {
   const { 

@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Comedy Material Management System API",
   "main": "dist/index.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "ts-node-dev --respawn src/index.ts",
     "build": "tsc",

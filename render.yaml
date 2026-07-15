@@ -1,0 +1,45 @@
+# Render Blueprint — deploy with "New Blueprint Instance" and point it at
+# this repo. Render only hosts the API here; the database is Neon (free,
+# no expiration) since Render's own free Postgres tier auto-expires after
+# 30 days. See README.md > "Deploying the backend for free" for the
+# step-by-step walkthrough.
+services:
+  - type: web
+    name: cmms-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      # Safe production default: this also disables the dev-login endpoint
+      # regardless of ALLOW_DEV_LOGIN (see backend/src/routes/auth.ts).
+      - key: NODE_ENV
+        value: production
+      # Paste the Neon connection string here (Dashboard > Connection Details).
+      - key: DATABASE_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      # Must byte-match this service's URL + /api/v1/auth/google/callback,
+      # and the Authorized redirect URI in Google Cloud Console. Render
+      # assigns the URL on first deploy, so fill this in afterward.
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      # Auto-generated per environment; production doesn't need to share
+      # the secret used in local dev.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      # Your deployed Vercel frontend URL (no trailing slash).
+      - key: FRONTEND_URL
+        sync: false
+      # Leave true only for initial testing before Google OAuth is wired
+      # up — NODE_ENV=production already blocks the dev-login route, so
+      # this has no effect unless you also flip NODE_ENV to development.
+      - key: ALLOW_DEV_LOGIN
+        value: "true"

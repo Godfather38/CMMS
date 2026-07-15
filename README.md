@@ -131,6 +131,56 @@ All endpoints live under `/api/v1` and require `Authorization: Bearer <jwt>`
 | Sync | `POST /sync/full`, `POST /sync/document/:id`, `GET /sync/status` |
 | Colors | `GET /colors/suggest?document_id=` |
 
+## Deploying the backend for free (Render + Neon)
+
+Render's free web-service tier runs the Express app exactly as-is (no
+serverless conversion needed) but its own free Postgres expires after 30
+days. Neon's free Postgres tier has no expiration, so pair the two: Neon for
+the database, Render for the API.
+
+**1. Database — Neon**
+
+1. Create a free project at https://neon.tech (no card required).
+2. Copy the connection string from the dashboard (Dashboard → Connection
+   Details → "Pooled connection" — includes `?sslmode=require`).
+3. Apply the schema against it:
+   ```bash
+   DATABASE_URL="<your neon connection string>" npm --prefix backend run db:init
+   ```
+
+**2. API — Render**
+
+The repo includes `render.yaml`, a Blueprint that pre-fills most of the
+service config:
+
+1. In the Render dashboard: **New → Blueprint**, connect this GitHub repo.
+   Render reads `render.yaml` and proposes a `cmms-backend` web service on
+   the free plan, rooted at `backend/`.
+2. Before deploying, fill in the env vars marked "sync: false" in the
+   Blueprint: `DATABASE_URL` (from Neon), `GOOGLE_CLIENT_ID` /
+   `GOOGLE_CLIENT_SECRET` (from Google Cloud), `FRONTEND_URL` (your Vercel
+   domain). Leave `GOOGLE_REDIRECT_URI` blank for now — you don't know the
+   service's URL until after the first deploy.
+3. Deploy. Render assigns a URL like `https://cmms-backend-xxxx.onrender.com`.
+4. Now go back and set `GOOGLE_REDIRECT_URI` to
+   `https://<that-url>/api/v1/auth/google/callback`, and add the **same**
+   URI to the OAuth client's Authorized redirect URIs in Google Cloud
+   Console (must byte-match). Redeploy for the env var change to apply.
+5. Sanity check: `curl https://<that-url>/health` should return
+   `{"status":"ok",...}`.
+
+Free-tier caveat: the service spins down after ~15 minutes idle and cold
+starts (a few seconds) on the next request — fine for a personal project,
+noticeable if you leave it untouched and then click a login button.
+
+**3. Point the frontend at it** — see the Vercel section below; the short
+version is adding one rewrite line to `frontend/vercel.json` with the Render
+URL from step 3 above.
+
+*(Alternative: Railway also has a free trial-credit tier and works the same
+way — connect the repo, root directory `backend`, same env vars, no
+`render.yaml` needed since Railway's dashboard config covers it.)*
+
 ## Deploying the frontend to Vercel
 
 This is a monorepo with no root `package.json`, so Vercel can't build from the

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User as UserIcon, FolderOpen, Tags, Database, CheckCircle2, RefreshCw, Save } from 'lucide-react';
+import { User as UserIcon, FolderOpen, Tags, Database, CheckCircle2, RefreshCw, Save, ClipboardCopy } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '../lib/utils';
 import { Button, Input } from '../components/ui';
@@ -8,6 +8,51 @@ import { TagManager } from '../components/tags/TagManager';
 import { useAuthStore } from '../stores/authStore';
 import { useSyncStatus, useFullSync } from '../hooks/useSync';
 import { api, apiErrorMessage } from '../services/api';
+
+const AddonCard = () => {
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const copyConnectCode = async () => {
+    setError(null);
+    try {
+      const res = await api.post('/auth/addon-token');
+      await navigator.clipboard.writeText(res.data.data.token);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 6000);
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    }
+  };
+
+  return (
+    <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-6 space-y-3">
+      <h4 className="text-sm font-medium text-gray-900">Google Docs add-on</h4>
+      <p className="text-sm text-gray-500">
+        Mark and tag material from inside Google Docs. Install the sidebar once per doc (see the{' '}
+        <a
+          href="https://github.com/Godfather38/CMMS/tree/main/apps-script"
+          target="_blank"
+          rel="noreferrer"
+          className="text-indigo-600 hover:underline"
+        >
+          install guide
+        </a>
+        ), then paste a connect code into it.
+      </p>
+      <Button onClick={copyConnectCode} variant="secondary">
+        <ClipboardCopy size={16} className="mr-2" />
+        {copied ? 'Copied!' : 'Copy connect code'}
+      </Button>
+      {copied && (
+        <p className="text-sm text-green-600">
+          Copied — paste it into the CMMS sidebar in Google Docs. Valid for 90 days.
+        </p>
+      )}
+      {error && <p className="text-sm text-red-600">{error}</p>}
+    </div>
+  );
+};
 
 const AccountTab = () => {
   const user = useAuthStore((state) => state.user);
@@ -67,6 +112,7 @@ const AccountTab = () => {
         </div>
         {message && <p className="text-sm text-gray-500">{message}</p>}
       </div>
+      <AddonCard />
     </div>
   );
 };

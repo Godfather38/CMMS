@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top" />
+    <style>
+      * { box-sizing: border-box; }
+      body { font-family: 'Google Sans', Roboto, Arial, sans-serif; font-size: 13px; color: #202124; margin: 0; padding: 12px; }
+      h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #5f6368; margin: 18px 0 8px; }
+      button { background: #4f46e5; color: #fff; border: 0; border-radius: 6px; padding: 8px 12px; font-size: 13px; cursor: pointer; width: 100%; }
+      button:disabled { opacity: 0.5; cursor: default; }
+      button.secondary { background: #fff; color: #202124; border: 1px solid #dadce0; }
+      button.small { width: auto; padding: 4px 8px; font-size: 12px; }
+      input, select { width: 100%; padding: 7px 8px; border: 1px solid #dadce0; border-radius: 6px; font-size: 13px; margin-bottom: 8px; }
+      .banner { padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; font-size: 12px; display: none; }
+      .banner.error { background: #fce8e6; color: #c5221f; display: block; }
+      .banner.ok { background: #e6f4ea; color: #137333; display: block; }
+      .banner.info { background: #e8f0fe; color: #1a56c4; display: block; }
+      .card { border: 1px solid #e8eaed; border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+      .seg { display: flex; align-items: flex-start; gap: 8px; padding: 8px; border: 1px solid #e8eaed; border-radius: 8px; margin-bottom: 6px; }
+      .dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 3px; flex-shrink: 0; }
+      .seg .meta { flex: 1; min-width: 0; }
+      .seg .title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .seg .sub { color: #5f6368; font-size: 11px; }
+      .chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 8px; }
+      .chip { border: 1px solid #dadce0; border-radius: 999px; padding: 2px 8px; font-size: 11px; cursor: pointer; background: #fff; width: auto; color: #202124; }
+      .chip.on { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+      .result { padding: 6px 8px; border: 1px solid #e8eaed; border-radius: 6px; margin-bottom: 4px; cursor: pointer; }
+      .result:hover, .result.on { border-color: #4f46e5; background: #eef2ff; }
+      .muted { color: #5f6368; font-size: 12px; }
+      .row { display: flex; gap: 6px; }
+      #app { display: none; }
+      label { font-size: 12px; color: #5f6368; display: block; margin-bottom: 2px; }
+      .status-pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; }
+      .status-pill.reg { background: #e6f4ea; color: #137333; }
+      .status-pill.unreg { background: #fef7e0; color: #b06000; }
+    </style>
+  </head>
+  <body>
+    <div id="banner" class="banner"></div>
+
+    <!-- Connect panel -->
+    <div id="connect">
+      <h3>Connect to CMMS</h3>
+      <div id="waking" class="banner info">Waking up the CMMS server… (free hosting naps when idle, up to a minute)</div>
+      <label>Server URL</label>
+      <input id="baseUrl" placeholder="https://cmms-backend-....onrender.com" />
+      <label>Connect code (from the web app: Settings → Account → Docs add-on)</label>
+      <input id="token" placeholder="Paste connect code" />
+      <button onclick="connect()">Connect</button>
+    </div>
+
+    <!-- Main app -->
+    <div id="app">
+      <div class="card">
+        <div class="row" style="justify-content: space-between; align-items: center">
+          <strong id="docTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"></strong>
+          <span id="regPill" class="status-pill unreg">Not registered</span>
+        </div>
+        <div id="registerWrap" style="margin-top: 8px; display: none">
+          <button onclick="registerDoc()">Register this document</button>
+        </div>
+      </div>
+
+      <div id="tools" style="display: none">
+        <h3>New segment from selection</h3>
+        <div class="card">
+          <label>Category *</label>
+          <select id="categorySel"></select>
+          <label>Title (optional)</label>
+          <input id="segTitle" placeholder="Auto from first words" />
+          <label>Tags</label>
+          <div id="tagChips" class="chips"></div>
+          <button onclick="createSegment()">Create segment</button>
+        </div>
+
+        <h3>Associate selection with…</h3>
+        <div class="card">
+          <input id="assocSearch" placeholder="Search your material…" oninput="debounceSearch('assoc')" />
+          <div id="assocResults"></div>
+          <label>Association type</label>
+          <select id="assocType">
+            <option value="callback">Callback (reference in a set)</option>
+            <option value="derivative">Derivative (modified version)</option>
+            <option value="reference">Reference (loose connection)</option>
+          </select>
+          <button onclick="associate()">Link selection</button>
+        </div>
+
+        <h3>Insert from library</h3>
+        <div class="card">
+          <input id="insertSearch" placeholder="Search your material…" oninput="debounceSearch('insert')" />
+          <div id="insertResults"></div>
+          <label style="display: flex; align-items: center; gap: 6px; margin: 6px 0">
+            <input type="checkbox" id="linkedCopy" checked style="width: auto; margin: 0" /> Insert as linked copy (tracked)
+          </label>
+          <button onclick="insertMaterial()">Insert at cursor</button>
+        </div>
+
+        <h3>
+          Segments in this doc
+          <button class="small secondary" style="float: right" onclick="syncNow()">Sync</button>
+        </h3>
+        <div id="segList"><span class="muted">Loading…</span></div>
+      </div>
+    </div>
+
+    <script>
+      var state = { categories: [], tags: [], selectedTags: [], assocPick: null, insertPick: null, timers: {} };
+
+      function $(id) { return document.getElementById(id); }
+      function banner(kind, msg) {
+        var b = $('banner');
+        b.className = 'banner ' + kind;
+        b.textContent = msg;
+        if (kind === 'ok') setTimeout(function () { b.className = 'banner'; }, 4000);
+      }
+      function fail(err) { banner('error', err && err.message ? err.message : String(err)); }
+      function run(name) {
+        var args = Array.prototype.slice.call(arguments, 1);
+        return new Promise(function (resolve, reject) {
+          var r = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+          r[name].apply(r, args);
+        });
+      }
+
+      // ---- boot ----
+      run('getSettings').then(function (s) {
+        $('baseUrl').value = s.baseUrl;
+        if (s.hasToken) { showApp(); } else {
+          run('pingBackend').then(function () { $('waking').style.display = 'none'; });
+        }
+      }).catch(fail);
+
+      function connect() {
+        banner('info', 'Connecting…');
+        run('saveSettings', $('baseUrl').value, $('token').value)
+          .then(function () { return run('pingBackend'); })
+          .then(function () { return showApp(); })
+          .catch(fail);
+      }
+
+      function showApp() {
+        $('connect').style.display = 'none';
+        $('app').style.display = 'block';
+        banner('info', 'Loading… (first call may wake the server)');
+        return refreshStatus().then(function () { $('banner').className = 'banner'; }).catch(fail);
+      }
+
+      function refreshStatus() {
+        return run('getDocStatus').then(function (st) {
+          $('docTitle').textContent = st.title;
+          if (st.registered) {
+            $('regPill').textContent = 'Registered';
+            $('regPill').className = 'status-pill reg';
+            $('registerWrap').style.display = 'none';
+            $('tools').style.display = 'block';
+            return Promise.all([loadMeta(), loadSegments()]);
+          } else {
+            $('regPill').textContent = 'Not registered';
+            $('regPill').className = 'status-pill unreg';
+            $('registerWrap').style.display = 'block';
+            $('tools').style.display = 'none';
+          }
+        });
+      }
+
+      function registerDoc() {
+        banner('info', 'Registering…');
+        run('registerDoc').then(function () { banner('ok', 'Document registered.'); return refreshStatus(); }).catch(fail);
+      }
+
+      function loadMeta() {
+        return Promise.all([run('getCategories'), run('getTags')]).then(function (res) {
+          state.categories = res[0]; state.tags = res[1];
+          $('categorySel').innerHTML = state.categories.map(function (c) {
+            return '<option value="' + c.id + '">' + (c.icon || '') + ' ' + c.name + '</option>';
+          }).join('');
+          renderTagChips();
+        });
+      }
+
+      function renderTagChips() {
+        $('tagChips').innerHTML = state.tags.map(function (t) {
+          var on = state.selectedTags.indexOf(t.id) !== -1;
+          return '<button type="button" class="chip' + (on ? ' on' : '') + '" onclick="toggleTag(\'' + t.id + '\')">' + t.name + '</button>';
+        }).join('') || '<span class="muted">No tags yet — add them in the web app</span>';
+      }
+      function toggleTag(id) {
+        var i = state.selectedTags.indexOf(id);
+        if (i === -1) state.selectedTags.push(id); else state.selectedTags.splice(i, 1);
+        renderTagChips();
+      }
+
+      function createSegment() {
+        banner('info', 'Creating segment…');
+        run('createSegmentFromSelection', {
+          category_id: $('categorySel').value,
+          title: $('segTitle').value,
+          tag_ids: state.selectedTags,
+        }).then(function (seg) {
+          banner('ok', 'Segment "' + (seg.title || 'Untitled') + '" created.');
+          $('segTitle').value = ''; state.selectedTags = []; renderTagChips();
+          return loadSegments();
+        }).catch(fail);
+      }
+
+      // ---- search pickers ----
+      function debounceSearch(which) {
+        clearTimeout(state.timers[which]);
+        state.timers[which] = setTimeout(function () { doSearch(which); }, 350);
+      }
+      function doSearch(which) {
+        var q = $(which === 'assoc' ? 'assocSearch' : 'insertSearch').value.trim();
+        if (!q) { $(which + 'Results').innerHTML = ''; return; }
+        run('searchLibrary', q).then(function (items) {
+          $(which + 'Results').innerHTML = items.map(function (s) {
+            return '<div class="result" onclick="pick(\'' + which + '\',\'' + s.id + '\', this)">' +
+              '<strong>' + (s.title || 'Untitled') + '</strong> <span class="muted">' + s.category + '</span>' +
+              '<div class="muted">' + s.snippet + '…</div></div>';
+          }).join('') || '<span class="muted">No matches</span>';
+        }).catch(fail);
+      }
+      function pick(which, id, el) {
+        state[which + 'Pick'] = id;
+        var parent = el.parentNode.children;
+        for (var i = 0; i < parent.length; i++) parent[i].className = 'result';
+        el.className = 'result on';
+      }
+
+      function associate() {
+        if (!state.assocPick) return banner('error', 'Search and pick a segment to link to first.');
+        banner('info', 'Linking selection…');
+        run('associateSelection', { segment_id: state.assocPick, association_type: $('assocType').value })
+          .then(function () { banner('ok', 'Linked. Highlight inherits the original color.'); return loadSegments(); })
+          .catch(fail);
+      }
+
+      function insertMaterial() {
+        if (!state.insertPick) return banner('error', 'Search and pick a segment to insert first.');
+        banner('info', 'Inserting…');
+        run('insertFromLibrary', { segment_id: state.insertPick, linked: $('linkedCopy').checked })
+          .then(function (r) { banner('ok', r.linked ? 'Inserted as tracked linked copy.' : 'Inserted as plain text.'); return loadSegments(); })
+          .catch(fail);
+      }
+
+      // ---- segment list & sync ----
+      function loadSegments() {
+        return run('listDocSegments').then(function (res) {
+          if (!res.registered) return;
+          $('segList').innerHTML = res.segments.map(function (s) {
+            return '<div class="seg">' +
+              '<span class="dot" style="background:' + s.color + '"></span>' +
+              '<div class="meta">' +
+                '<div class="title">' + (s.title || 'Untitled') + (s.is_primary ? '' : ' <span class="muted">(copy)</span>') + '</div>' +
+                '<div class="sub">' + (s.category ? (s.category.icon || '') + ' ' + s.category.name : '') +
+                  (s.tags.length ? ' · ' + s.tags.map(function (t) { return t.name; }).join(', ') : '') +
+                  (s.markerPresent ? '' : ' · ⚠ marker missing') + '</div>' +
+              '</div>' +
+              (s.markerPresent ? '<button class="small secondary" onclick="goTo(\'' + s.id + '\')">Go</button>' : '') +
+            '</div>';
+          }).join('') || '<span class="muted">No segments in this doc yet — select text above and create one.</span>';
+        });
+      }
+      function goTo(id) { run('goToSegment', id).catch(fail); }
+
+      function syncNow() {
+        banner('info', 'Syncing with Google Docs…');
+        run('syncMarkers').then(function (r) {
+          var msg = 'Synced: ' + r.updated + ' updated, ' + r.repositioned + ' repositioned.';
+          if (r.orphans.length) msg += ' ⚠ Missing markers: ' + r.orphans.join(', ');
+          banner(r.orphans.length ? 'error' : 'ok', msg);
+          return loadSegments();
+        }).catch(fail);
+      }
+    </script>
+  </body>
+</html>

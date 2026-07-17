@@ -221,9 +221,21 @@ results in a 404 on every page.
 - Google tokens are stored per-user in `user_google_tokens`; rotating the
   OAuth client secret only requires updating `backend/.env`.
 
+## Google Docs sidebar
+
+The companion that makes CMMS whole: mark a selection as a segment,
+categorize/tag it, link callbacks, and insert material — from inside Google
+Docs. It's an Apps Script sidebar (Docs' canvas rendering blocks classic
+browser extensions; Apps Script retains full document API access). Install
+guide, connect-code flow, and a full test checklist: **[apps-script/README.md](./apps-script/README.md)**.
+
+The sidebar places `cmms_segment_<uuid>` named ranges; the backend measures
+them (`POST /segments/from-marker`) and the sync engine reconciles them —
+producer and consumer share one index space by construction.
+
 ## Roadmap (spec phases not yet built)
 
-- Chrome extension / Google Docs sidebar (marker placement, quick tagging,
-  insert-from-library)
+- Publishing the sidebar as a Workspace Marketplace add-on (today it's
+  pasted per-doc via the script editor)
 - Drive webhooks for push-based sync
 - Set composition tools, analytics, sharing, export

@@ -57,6 +57,12 @@ export const documentIdParamSchema = z.object({
   }),
 });
 
+export const documentByFileParamSchema = z.object({
+  params: z.object({
+    google_file_id: z.string().min(1).max(255),
+  }),
+});
+
 // --- SEGMENT SCHEMAS ---
 
 export const createSegmentSchema = z.object({
@@ -131,6 +137,27 @@ export const segmentIdParamSchema = z.object({
   params: z.object({
     id: z.string().uuid(),
   }),
+});
+
+export const createFromMarkerSchema = z.object({
+  body: z
+    .object({
+      google_file_id: z.string().min(1).max(255),
+      marker_id: z.string().uuid(),
+      category_id: z.string().uuid().optional(),
+      title: z.string().max(255).optional(),
+      tag_ids: z.array(z.string().uuid()).optional(),
+      associate_with_segment_id: z.string().uuid().optional(),
+      association_type: z.enum(['derivative', 'callback', 'reference']).optional(),
+    })
+    .refine((b) => !!b.category_id !== !!b.associate_with_segment_id, {
+      message: 'Provide exactly one of category_id or associate_with_segment_id',
+      path: ['category_id'],
+    })
+    .refine((b) => !b.associate_with_segment_id || !!b.association_type, {
+      message: 'association_type is required when associating',
+      path: ['association_type'],
+    }),
 });
 
 export const updateSegmentColorSchema = z.object({

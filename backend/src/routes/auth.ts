@@ -63,6 +63,17 @@ router.patch(
   }
 );
 
+// POST /api/v1/auth/addon-token — long-lived token for the Google Docs sidebar
+router.post('/addon-token', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  res.status(200).json({
+    status: 'success',
+    data: {
+      token: authService.signAddonToken(req.user!),
+      expires_in: authService.ADDON_TOKEN_TTL,
+    },
+  });
+});
+
 // POST /api/v1/auth/logout
 router.post('/logout', (req: Request, res: Response) => {
   // Stateless JWTs: logout is client-side (delete token).

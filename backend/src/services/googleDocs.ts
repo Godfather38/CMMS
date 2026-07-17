@@ -74,19 +74,79 @@ export const getCmmsNamedRanges = (doc: docs_v1.Schema$Document) => {
   const cmmsRanges: Record<string, { start: number; end: number }> = {};
 
   for (const [name, rangeObj] of Object.entries(ranges)) {
-    if (name.startsWith('cmms_segment_') && rangeObj.namedRanges && rangeObj.namedRanges.length > 0) {
-      // Named ranges can be split (e.g. across pages), but for segments we assume contiguous 
-      // or take the outer bounds. Using the first range instance for now.
-      const range = rangeObj.namedRanges[0].ranges?.[0];
-      if (range && typeof range.startIndex === 'number' && typeof range.endIndex === 'number') {
-        const segmentId = name.replace('cmms_segment_', '');
-        cmmsRanges[segmentId] = {
-          start: range.startIndex,
-          end: range.endIndex
-        };
+    if (!name.startsWith('cmms_segment_')) continue;
+
+    // Docs fragments named ranges after heavy edits (multiple instances, each
+    // with multiple sub-ranges). Take the outer bounds across all of them.
+    let start = Infinity;
+    let end = -Infinity;
+    for (const instance of rangeObj.namedRanges || []) {
+      for (const range of instance.ranges || []) {
+        if (typeof range.startIndex === 'number' && range.startIndex < start) start = range.startIndex;
+        if (typeof range.endIndex === 'number' && range.endIndex > end) end = range.endIndex;
       }
+    }
+
+    if (start !== Infinity && end !== -Infinity) {
+      cmmsRanges[name.replace('cmms_segment_', '')] = { start, end };
     }
   }
 
   return cmmsRanges;
+};
+
+/**
+ * Extract the exact text a [startIndex, endIndex) span covers, in the Docs
+ * API's own index space (body starts at index 1; tables, section breaks, and
+ * inline objects consume indexes without contributing text; indexes count
+ * UTF-16 code units, same as JS string offsets).
+ *
+ * This is the single source of truth for marker text — used both when a
+ * segment is created from a named range and when sync re-reads it — so the
+ * producer and the sync engine can never disagree.
+ */
+export const extractTextForRange = (
+  doc: docs_v1.Schema$Document,
+  startIndex: number,
+  endIndex: number
+): string => {
+  if (!doc.body || !doc.body.content) return '';
+  return sliceStructuralElements(doc.body.content, startIndex, endIndex);
+};
+
+const sliceStructuralElements = (
+  elements: docs_v1.Schema$StructuralElement[],
+  startIndex: number,
+  endIndex: number
+): string => {
+  let text = '';
+
+  for (const el of elements) {
+    if (typeof el.endIndex === 'number' && el.endIndex <= startIndex) continue;
+    if (typeof el.startIndex === 'number' && el.startIndex >= endIndex) break; // content is ordered
+
+    if (el.paragraph) {
+      for (const pe of el.paragraph.elements || []) {
+        if (!pe.textRun || typeof pe.startIndex !== 'number' || typeof pe.endIndex !== 'number') {
+          continue; // inline objects / page breaks consume an index but hold no text
+        }
+        const from = Math.max(startIndex, pe.startIndex);
+        const to = Math.min(endIndex, pe.endIndex);
+        if (to > from) {
+          text += (pe.textRun.content || '').substring(from - pe.startIndex, to - pe.startIndex);
+        }
+      }
+    } else if (el.table) {
+      for (const row of el.table.tableRows || []) {
+        for (const cell of row.tableCells || []) {
+          text += sliceStructuralElements(cell.content || [], startIndex, endIndex);
+        }
+      }
+    } else if (el.tableOfContents) {
+      text += sliceStructuralElements(el.tableOfContents.content || [], startIndex, endIndex);
+    }
+    // sectionBreak: consumes an index, contributes no text
+  }
+
+  return text;
 };

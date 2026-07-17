@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { requireAuth } from '../middleware/auth';
-import { validate, listDocumentsSchema, createDocumentSchema, createFromSelectionSchema, documentIdParamSchema } from '../middleware/validation';
+import { validate, listDocumentsSchema, createDocumentSchema, createFromSelectionSchema, documentIdParamSchema, documentByFileParamSchema } from '../middleware/validation';
 import * as docService from '../services/documents';
 import * as syncService from '../services/sync';
 import { AuthenticatedRequest } from '../types';
@@ -26,6 +26,15 @@ router.get('/', validate(listDocumentsSchema), async (req: AuthenticatedRequest,
         offset: filters.offset
       }
     });
+  } catch (err) { next(err); }
+});
+
+// GET /api/v1/documents/by-file/:google_file_id — sidebar's registration check
+router.get('/by-file/:google_file_id', validate(documentByFileParamSchema), async (req: AuthenticatedRequest, res: Response, next) => {
+  try {
+    const doc = await docService.getDocumentByGoogleFileId(req.user!.id, req.params.google_file_id);
+    if (!doc) throw new AppError('Document not registered', 404);
+    res.json({ status: 'success', data: doc });
   } catch (err) { next(err); }
 });
 

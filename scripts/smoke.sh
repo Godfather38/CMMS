@@ -130,6 +130,25 @@ LIST=$(api GET "/segments?category_id=$CAT_ONELINER&limit=5")
 check "list segments by category" "$(echo "$LIST" | jq '.data | length >= 1')" "true"
 check "pagination metadata present" "$(echo "$LIST" | jq '.pagination.total >= 1')" "true"
 
+echo "== Add-on support endpoints =="
+ADDON=$(api POST /auth/addon-token)
+ADDON_TOKEN=$(echo "$ADDON" | jq -r '.data.token')
+check "addon-token issues a token" "$(echo "$ADDON" | jq -r '.data.token | length > 20')" "true"
+check "addon token expires in 90d" "$(echo "$ADDON" | jq -r '.data.expires_in')" "90d"
+ADDON_ME=$(curl -s "$BASE/auth/me" -H "Authorization: Bearer $ADDON_TOKEN")
+check "addon token authenticates" "$(echo "$ADDON_ME" | jq -r '.data.user.email')" "dev@cmms.local"
+
+BYFILE=$(api GET /documents/by-file/dev-file-1)
+check "documents/by-file finds the doc" "$(echo "$BYFILE" | jq -r '.data.title')" "Dev Notebook"
+check "documents/by-file 404s for unknown file" "$(api_code GET /documents/by-file/never-registered)" "404"
+
+MARKER_UUID="99999999-9999-4999-8999-999999999999"
+check "from-marker rejects both branches (400)" "$(api_code POST /segments/from-marker "{\"google_file_id\":\"dev-file-1\",\"marker_id\":\"$MARKER_UUID\",\"category_id\":\"$CAT_ONELINER\",\"associate_with_segment_id\":\"$MARKER_UUID\",\"association_type\":\"callback\"}")" "400"
+check "from-marker rejects neither branch (400)" "$(api_code POST /segments/from-marker "{\"google_file_id\":\"dev-file-1\",\"marker_id\":\"$MARKER_UUID\"}")" "400"
+check "from-marker 404s for unregistered doc" "$(api_code POST /segments/from-marker "{\"google_file_id\":\"never-registered\",\"marker_id\":\"$MARKER_UUID\",\"category_id\":\"$CAT_ONELINER\"}")" "404"
+FM_MSG=$(api POST /segments/from-marker "{\"google_file_id\":\"dev-file-1\",\"marker_id\":\"$MARKER_UUID\",\"category_id\":\"$CAT_ONELINER\"}" | jq -r '.message')
+check "from-marker fails cleanly without Google connection" "$(echo "$FM_MSG" | grep -c 'Google account not connected')" "1"
+
 echo "== Drive endpoints fail gracefully for dev user =="
 REG_CODE=$(api_code POST /documents '{"google_file_id":"1FakeDriveFileIdForSmokeTest"}')
 check "register real doc → 401 (Google not connected)" "$REG_CODE" "401"

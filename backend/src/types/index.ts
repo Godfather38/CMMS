@@ -14,6 +14,7 @@ export interface User {
 export interface TokenPayload {
   userId: string;
   email: string;
+  scope?: 'addon';
 }
 
 export interface AuthenticatedRequest extends Request {

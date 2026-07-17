@@ -58,3 +58,13 @@ export interface UpdateMarkersDTO {
   start_offset: number;
   end_offset: number;
 }
+
+export interface CreateFromMarkerDTO {
+  google_file_id: string;
+  marker_id: string;
+  category_id?: string;
+  title?: string;
+  tag_ids?: string[];
+  associate_with_segment_id?: string;
+  association_type?: AssociationType;
+}

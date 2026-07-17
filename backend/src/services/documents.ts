@@ -66,6 +66,17 @@ export const listDocuments = async (userId: string, filters: DocumentQueryFilter
   };
 };
 
+export const getDocumentByGoogleFileId = async (userId: string, googleFileId: string) => {
+  const { rows } = await db.query(
+    `SELECT d.*,
+       (SELECT COUNT(*)::int FROM segments s WHERE s.document_id = d.id) AS segment_count
+     FROM documents d
+     WHERE d.user_id = $1 AND d.google_file_id = $2 AND d.is_active = true`,
+    [userId, googleFileId]
+  );
+  return rows[0] || null;
+};
+
 export const getDocumentById = async (userId: string, id: string) => {
   const query = `
     SELECT 

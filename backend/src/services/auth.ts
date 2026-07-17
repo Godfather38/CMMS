@@ -18,6 +18,17 @@ export const signToken = (user: User): string => {
   } as jwt.SignOptions);
 };
 
+// Long-lived token pasted once into the Google Docs sidebar. Stateless like
+// every other JWT here: cannot be revoked before expiry (documented trade-off).
+export const ADDON_TOKEN_TTL = '90d';
+
+export const signAddonToken = (user: User): string => {
+  const payload: TokenPayload = { userId: user.id, email: user.email, scope: 'addon' };
+  return jwt.sign(payload, env.JWT_SECRET, {
+    expiresIn: ADDON_TOKEN_TTL,
+  } as jwt.SignOptions);
+};
+
 const upsertUser = async (profile: {
   google_id: string;
   email: string;

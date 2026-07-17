@@ -27,12 +27,10 @@ export const syncDocument = async (userId: string, documentId: string): Promise<
 
     // 2. Fetch from Google
     let driveDoc;
-    let fullText = '';
     let namedRanges: Record<string, { start: number; end: number }> = {};
 
     try {
       driveDoc = await googleDocs.fetchDocument(userId, doc.google_file_id);
-      fullText = googleDocs.extractFullText(driveDoc);
       namedRanges = googleDocs.getCmmsNamedRanges(driveDoc);
     } catch (error: any) {
       // Handle File Missing/No Access
@@ -77,9 +75,11 @@ export const syncDocument = async (userId: string, documentId: string): Promise<
         continue;
       }
 
-      // Check Text & Position
-      const docText = fullText.substring(range.start, range.end);
-      
+      // Check Text & Position — sliced in Docs index space, matching the
+      // named-range indexes exactly (extractFullText concatenation is 0-based
+      // and misaligns with document indexes).
+      const docText = googleDocs.extractTextForRange(driveDoc, range.start, range.end);
+
       const textChanged = docText !== segment.text_content;
       const posChanged = range.start !== segment.start_offset || range.end !== segment.end_offset;
 

@@ -9,12 +9,14 @@ import {
   updateTagsSchema,
   addSegmentTagsSchema,
   updateSegmentColorSchema,
+  createFromMarkerSchema,
   listSegmentsSchema,
   segmentIdParamSchema,
   segmentIdTagIdParamSchema
 } from '../middleware/validation';
 import * as segmentService from '../services/segments';
-import * as tagService from '../services/tags'; // Import Tag Service
+import * as fromMarkerService from '../services/segmentsFromMarker';
+import * as tagService from '../services/tags';
 import { AuthenticatedRequest } from '../types';
 import { AppError } from '../utils/errors';
 
@@ -58,6 +60,15 @@ router.get('/:id/associations', validate(segmentIdParamSchema), async (req: Auth
   try {
     const associations = await segmentService.getSegmentAssociations(req.user!.id, req.params.id);
     res.json({ status: 'success', data: associations });
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/segments/from-marker — the Docs sidebar places a named range,
+// the server measures it and creates the segment (or linked copy)
+router.post('/from-marker', validate(createFromMarkerSchema), async (req: AuthenticatedRequest, res: Response, next) => {
+  try {
+    const { segment, created } = await fromMarkerService.createSegmentFromMarker(req.user!.id, req.body);
+    res.status(created ? 201 : 200).json({ status: 'success', data: segment });
   } catch (err) { next(err); }
 });
 

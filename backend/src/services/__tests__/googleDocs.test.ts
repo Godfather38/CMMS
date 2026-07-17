@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractFullText, getCmmsNamedRanges } from '../googleDocs';
+import { extractFullText, extractTextForRange, getCmmsNamedRanges } from '../googleDocs';
 import type { docs_v1 } from 'googleapis';
 
 const fixtureDoc: docs_v1.Schema$Document = {
@@ -65,6 +65,114 @@ describe('extractFullText', () => {
   });
 });
 
+/**
+ * Fixture with REAL Docs API index arithmetic: body starts at index 1,
+ * tables and inline objects consume indexes without contributing text.
+ *
+ * Index map:
+ *   [1,21)   run A "Why do gas stations "
+ *   [21,41)  run B "always smell weird?\n"
+ *   [41,58)  table (structural glyphs at 41/42, 49, 56-57 hold no text)
+ *     [43,49)  cell 1 run "cellA\n"
+ *     [50,56)  cell 2 run "cellB\n"
+ *   [58,72)  paragraph with an inline image:
+ *     [58,65)  run C "before "
+ *     [65,66)  inlineObjectElement (1 index, no text)
+ *     [66,72)  run D "after\n"
+ */
+const indexedDoc: docs_v1.Schema$Document = {
+  documentId: 'indexed-doc',
+  body: {
+    content: [
+      {
+        startIndex: 1,
+        endIndex: 41,
+        paragraph: {
+          elements: [
+            { startIndex: 1, endIndex: 21, textRun: { content: 'Why do gas stations ' } },
+            { startIndex: 21, endIndex: 41, textRun: { content: 'always smell weird?\n' } },
+          ],
+        },
+      },
+      {
+        startIndex: 41,
+        endIndex: 58,
+        table: {
+          tableRows: [
+            {
+              tableCells: [
+                {
+                  content: [
+                    {
+                      startIndex: 43,
+                      endIndex: 49,
+                      paragraph: {
+                        elements: [{ startIndex: 43, endIndex: 49, textRun: { content: 'cellA\n' } }],
+                      },
+                    },
+                  ],
+                },
+                {
+                  content: [
+                    {
+                      startIndex: 50,
+                      endIndex: 56,
+                      paragraph: {
+                        elements: [{ startIndex: 50, endIndex: 56, textRun: { content: 'cellB\n' } }],
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        startIndex: 58,
+        endIndex: 72,
+        paragraph: {
+          elements: [
+            { startIndex: 58, endIndex: 65, textRun: { content: 'before ' } },
+            { startIndex: 65, endIndex: 66, inlineObjectElement: { inlineObjectId: 'img1' } },
+            { startIndex: 66, endIndex: 72, textRun: { content: 'after\n' } },
+          ],
+        },
+      },
+    ],
+  },
+};
+
+describe('extractTextForRange', () => {
+  it('slices within a single run', () => {
+    expect(extractTextForRange(indexedDoc, 8, 14)).toBe('gas st');
+  });
+
+  it('slices across runs, keeping the paragraph newline', () => {
+    expect(extractTextForRange(indexedDoc, 15, 25)).toBe('tions alwa');
+  });
+
+  it('returns a whole paragraph exactly — where 0-based substring was off by one', () => {
+    const exact = extractTextForRange(indexedDoc, 1, 41);
+    expect(exact).toBe('Why do gas stations always smell weird?\n');
+    // The old approach: slice the 0-based concatenation with document indexes
+    const oldApproach = extractFullText(indexedDoc).substring(1, 41);
+    expect(oldApproach).not.toBe(exact); // drops the leading 'W', eats a trailing char
+  });
+
+  it('slices across table cells without inventing text for structural indexes', () => {
+    expect(extractTextForRange(indexedDoc, 45, 53)).toBe('llA\ncel');
+  });
+
+  it('skips inline objects but keeps surrounding text', () => {
+    expect(extractTextForRange(indexedDoc, 60, 70)).toBe('fore afte');
+  });
+
+  it('returns empty for a document with no body', () => {
+    expect(extractTextForRange({ documentId: 'empty' }, 1, 10)).toBe('');
+  });
+});
+
 describe('getCmmsNamedRanges', () => {
   it('extracts only cmms_segment_* ranges keyed by segment id', () => {
     const ranges = getCmmsNamedRanges(fixtureDoc);
@@ -75,5 +183,26 @@ describe('getCmmsNamedRanges', () => {
 
   it('handles documents with no named ranges', () => {
     expect(getCmmsNamedRanges({ documentId: 'x' })).toEqual({});
+  });
+
+  it('takes outer bounds across fragmented instances and sub-ranges', () => {
+    const doc: docs_v1.Schema$Document = {
+      documentId: 'frag',
+      namedRanges: {
+        'cmms_segment_frag-1': {
+          namedRanges: [
+            { name: 'cmms_segment_frag-1', ranges: [{ startIndex: 12, endIndex: 20 }] },
+            {
+              name: 'cmms_segment_frag-1',
+              ranges: [
+                { startIndex: 5, endIndex: 9 },
+                { startIndex: 9, endIndex: 11 },
+              ],
+            },
+          ],
+        },
+      },
+    };
+    expect(getCmmsNamedRanges(doc)['frag-1']).toEqual({ start: 5, end: 20 });
   });
 });

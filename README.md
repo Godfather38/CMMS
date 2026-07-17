@@ -46,14 +46,16 @@ Local PostgreSQL:
 ```bash
 sudo -u postgres psql -c "CREATE USER cmms PASSWORD 'cmms'" \
                       -c "CREATE DATABASE cmms OWNER cmms"
-psql postgres://cmms:cmms@localhost:5432/cmms -f backend/schema.sql
 ```
 
-Or with Docker (applies the schema automatically on first start):
+Or with Docker:
 
 ```bash
 docker compose up -d postgres
 ```
+
+Either way the schema itself applies automatically: the backend detects an
+empty database on startup and runs `backend/schema.sql` for you.
 
 ## 2. Backend
 
@@ -143,10 +145,11 @@ the database, Render for the API.
 1. Create a free project at https://neon.tech (no card required).
 2. Copy the connection string from the dashboard (Dashboard → Connection
    Details → "Pooled connection" — includes `?sslmode=require`).
-3. Apply the schema against it:
-   ```bash
-   DATABASE_URL="<your neon connection string>" npm --prefix backend run db:init
-   ```
+3. That's it — no manual migration. The API checks the database on boot and
+   applies `backend/schema.sql` automatically when it finds it empty
+   (`backend/src/config/bootstrap.ts`), so the schema lands on the first
+   Render deploy. (`npm --prefix backend run db:init` still exists if you
+   ever want to apply it by hand.)
 
 **2. API — Render**
 

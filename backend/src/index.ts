@@ -10,6 +10,7 @@ import searchRoutes from './routes/search';
 import syncRoutes from './routes/sync';
 import colorRoutes from './routes/colors';
 import { errorHandler } from './middleware/errorHandler';
+import { ensureSchema } from './config/bootstrap';
 
 const app = express();
 
@@ -43,12 +44,19 @@ app.all('*', (req, res, next) => {
 // Global Error Handler
 app.use(errorHandler);
 
-// Start Server
+// Start Server (after making sure the database schema exists)
 const port = env.PORT;
-app.listen(port, () => {
-  console.log(`
+ensureSchema()
+  .then(() => {
+    app.listen(port, () => {
+      console.log(`
   🚀 Server running in ${env.NODE_ENV} mode
   🔊 Listening on port ${port}
   🔗 http://localhost:${port}
   `);
-});
+    });
+  })
+  .catch((err) => {
+    console.error('💥 Failed to initialize database schema:', err);
+    process.exit(1);
+  });

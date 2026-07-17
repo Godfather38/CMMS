@@ -142,11 +142,17 @@ export const registerDocument = async (user: User, dto: CreateDocumentDTO) => {
 
   const newDoc = rows[0];
 
-  // 5. Update Drive App Properties (async, non-blocking if needed, but safer to block here)
-  await driveService.updateFileProperties(user.id, fileId, {
-    cmms_registered: 'true',
-    cmms_doc_id: newDoc.id
-  });
+  // 5. Stamp Drive appProperties — best-effort. The DB row is the source of
+  // truth; failing here (transient Drive error, token refresh race) must not
+  // fail a registration that already succeeded.
+  try {
+    await driveService.updateFileProperties(user.id, fileId, {
+      cmms_registered: 'true',
+      cmms_doc_id: newDoc.id
+    });
+  } catch (err) {
+    console.error(`Failed to stamp appProperties on ${fileId} (registration still succeeded):`, err);
+  }
 
   return newDoc;
 };

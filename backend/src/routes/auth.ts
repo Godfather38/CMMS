@@ -5,6 +5,7 @@ import { requireAuth } from '../middleware/auth';
 import { validate, updateMeSchema } from '../middleware/validation';
 import { AuthenticatedRequest } from '../types';
 import { env } from '../config/env';
+import { UnauthorizedError } from '../utils/errors';
 
 const router = Router();
 
@@ -12,6 +13,14 @@ const router = Router();
 router.get('/google', (req: Request, res: Response) => {
   res.redirect(getAuthUrl());
 });
+
+// Every failed sign-in must land on /login with a code the UI can explain —
+// a silent bounce back to the login screen is never acceptable.
+const oauthErrorCode = (error: unknown): 'exchange_failed' | 'server_error' => {
+  if (error instanceof UnauthorizedError) return 'exchange_failed'; // no access_token / no profile
+  if ((error as any)?.response?.data?.error) return 'exchange_failed'; // Google rejected the exchange (invalid_grant, redirect_uri_mismatch)
+  return 'server_error';
+};
 
 // GET /api/v1/auth/google/callback — Google redirects here, we redirect to the SPA.
 // Token travels in the URL fragment so it never reaches server logs.
@@ -27,7 +36,7 @@ router.get('/google/callback', async (req: Request, res: Response) => {
     res.redirect(`${env.FRONTEND_URL}/auth/callback#token=${encodeURIComponent(token)}`);
   } catch (error) {
     console.error('Google OAuth callback failed:', error);
-    res.redirect(`${env.FRONTEND_URL}/login?error=auth_failed`);
+    res.redirect(`${env.FRONTEND_URL}/login?error=${oauthErrorCode(error)}`);
   }
 });
 

@@ -8,14 +8,26 @@ import { useOnboardingStore } from '../stores/onboardingStore';
 
 const DEV_LOGIN_ENABLED = import.meta.env.VITE_ALLOW_DEV_LOGIN === 'true';
 
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  missing_code:
+    'Google did not send back an authorization code (the sign-in may have been cancelled). Please try again.',
+  exchange_failed:
+    'Could not complete the Google sign-in exchange. If this keeps happening, the backend GOOGLE_REDIRECT_URI probably does not match Google Cloud Console.',
+  server_error: 'The server hit an unexpected error during sign-in. Try again in a minute.',
+  missing_token:
+    'Sign-in finished but no session token arrived. Check the FRONTEND_URL configured on the backend.',
+  auth_failed: 'Google sign-in failed. Please try again.',
+};
+
 export const Login = () => {
   const { setAuth } = useAuthStore();
   const onboardingCompleted = useOnboardingStore((s) => s.completed);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [devLoading, setDevLoading] = useState(false);
+  const errorCode = searchParams.get('error');
   const [error, setError] = useState<string | null>(
-    searchParams.get('error') ? 'Google sign-in failed. Please try again.' : null
+    errorCode ? AUTH_ERROR_MESSAGES[errorCode] ?? AUTH_ERROR_MESSAGES.auth_failed : null
   );
 
   // Full-page redirect: backend 302s to Google's consent screen, then

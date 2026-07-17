@@ -53,6 +53,8 @@ ensureSchema()
   🚀 Server running in ${env.NODE_ENV} mode
   🔊 Listening on port ${port}
   🔗 http://localhost:${port}
+  🌐 FRONTEND_URL:        ${env.FRONTEND_URL}
+  🔁 GOOGLE_REDIRECT_URI: ${env.GOOGLE_REDIRECT_URI}
   `);
     });
   })

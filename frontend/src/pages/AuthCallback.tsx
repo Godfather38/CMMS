@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
-import { api } from '../services/api';
+import { api, apiErrorMessage } from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import { useOnboardingStore } from '../stores/onboardingStore';
 
@@ -14,7 +14,7 @@ export const AuthCallback = () => {
   const navigate = useNavigate();
   const { setAuth } = useAuthStore();
   const onboardingCompleted = useOnboardingStore((s) => s.completed);
-  const [failed, setFailed] = useState(false);
+  const [failMessage, setFailMessage] = useState<string | null>(null);
   const ran = useRef(false);
 
   useEffect(() => {
@@ -38,14 +38,15 @@ export const AuthCallback = () => {
         setAuth(res.data.data.user, token);
         navigate(onboardingCompleted ? '/dashboard' : '/onboarding', { replace: true });
       })
-      .catch(() => setFailed(true));
+      .catch((err) => setFailMessage(apiErrorMessage(err)));
   }, [navigate, setAuth, onboardingCompleted]);
 
-  if (failed) {
+  if (failMessage) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <p className="text-gray-700 mb-4">Could not complete sign-in.</p>
+        <div className="text-center max-w-md px-4">
+          <p className="text-gray-700 mb-2">Could not complete sign-in.</p>
+          <p className="text-sm text-red-600 mb-4">{failMessage}</p>
           <button onClick={() => navigate('/login')} className="text-indigo-600 hover:underline text-sm">
             Back to login
           </button>

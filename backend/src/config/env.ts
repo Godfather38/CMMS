@@ -12,7 +12,13 @@ const envSchema = z.object({
   GOOGLE_REDIRECT_URI: z.string().url('GOOGLE_REDIRECT_URI must be a valid URL'),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 chars'),
   JWT_EXPIRES_IN: z.string().default('7d'),
-  FRONTEND_URL: z.string().url().default('http://localhost:5173'),
+  // Reduced to its origin: pasting a path (e.g. .../login) or trailing slash
+  // must never break the OAuth redirect back into the SPA.
+  FRONTEND_URL: z
+    .string()
+    .url()
+    .default('http://localhost:5173')
+    .transform((v) => new URL(v).origin),
   ALLOW_DEV_LOGIN: z
     .string()
     .optional()
